@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: repo-intelligence-analyzer
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: GITHUB_ACCESS_TOKEN
+        sync: false
+      - key: PORT
+        value: 3000
