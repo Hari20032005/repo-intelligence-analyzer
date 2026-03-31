@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitHub Repository Intelligence Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+    }
+
+    header {
+      border-bottom: 1px solid #21262d;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header svg { flex-shrink: 0; }
+    header h1 { font-size: 18px; font-weight: 700; color: #f0f6fc; }
+    header span { font-size: 13px; color: #7d8590; margin-left: 4px; }
+
+    .hero {
+      max-width: 720px;
+      margin: 60px auto 0;
+      padding: 0 24px;
+      text-align: center;
+    }
+    .hero h2 {
+      font-size: 36px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+      margin-bottom: 16px;
+    }
+    .hero p {
+      font-size: 16px;
+      color: #8b949e;
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    .pills {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 40px;
+    }
+    .pill {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+    .pill b { color: #58a6ff; }
+
+    .input-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 720px;
+      margin: 0 auto 24px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 20px;
+      border-bottom: 1px solid #30363d;
+    }
+    .tab {
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #8b949e;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      background: none;
+      border-top: none;
+      border-left: none;
+      border-right: none;
+      transition: color .15s;
+    }
+    .tab.active {
+      color: #f0f6fc;
+      border-bottom-color: #58a6ff;
+    }
+
+    label { display: block; font-size: 13px; color: #8b949e; margin-bottom: 8px; }
+
+    textarea {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 14px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      padding: 12px;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    textarea:focus { border-color: #58a6ff; }
+
+    input[type="text"] {
+      width: 100%;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e6edf3;
+      font-size: 14px;
+      font-family: inherit;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus { border-color: #58a6ff; }
+
+    .hint { font-size: 12px; color: #6e7681; margin-top: 8px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      padding: 10px 20px;
+      background: #238636;
+      border: 1px solid #2ea043;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, opacity .15s;
+    }
+    .btn:hover { background: #2ea043; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .spinner {
+      display: none;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-box {
+      display: none;
+      background: #2d1215;
+      border: 1px solid #f85149;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #f85149;
+      font-size: 13px;
+      margin-top: 16px;
+    }
+
+    /* ── Result section ─────────────────────────────── */
+    #result { max-width: 720px; margin: 0 auto 60px; padding: 0 24px; }
+
+    .summary-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .stat-num { font-size: 28px; font-weight: 800; color: #f0f6fc; }
+    .stat-label { font-size: 11px; color: #6e7681; margin-top: 2px; }
+
+    .repo-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 14px;
+    }
+    .repo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .repo-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #58a6ff;
+      text-decoration: none;
+    }
+    .repo-name:hover { text-decoration: underline; }
+    .repo-desc { font-size: 13px; color: #6e7681; margin-top: 4px; }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .badge-beginner     { background: #0d4429; color: #3fb950; }
+    .badge-intermediate { background: #2e1f00; color: #d29922; }
+    .badge-advanced     { background: #2d1215; color: #f85149; }
+
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+      color: #8b949e;
+      margin-bottom: 14px;
+    }
+    .meta-row span b { color: #e6edf3; }
+
+    .scores-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .score-row { display: flex; flex-direction: column; gap: 3px; }
+    .score-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+    .score-label-row span:first-child { color: #8b949e; }
+    .score-label-row span:last-child  { font-weight: 700; color: #f0f6fc; }
+    .bar-bg {
+      background: #21262d;
+      border-radius: 4px;
+      height: 6px;
+    }
+    .bar-fill {
+      height: 6px;
+      border-radius: 4px;
+      transition: width .4s ease;
+    }
+
+    .health-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding-top: 12px;
+      border-top: 1px solid #21262d;
+      font-size: 11px;
+    }
+    .sig { padding: 2px 8px; border-radius: 4px; }
+    .sig-ok  { background: #0d4429; color: #3fb950; }
+    .sig-no  { background: #161b22; color: #484f58; border: 1px solid #21262d; }
+
+    .error-card {
+      background: #2d1215;
+      border: 1px solid #f85149;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 14px;
+      font-size: 13px;
+    }
+    .error-card a { color: #58a6ff; }
+
+    .rate-limit-note {
+      text-align: center;
+      font-size: 12px;
+      color: #484f58;
+      margin-bottom: 20px;
+    }
+
+    footer {
+      border-top: 1px solid #21262d;
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #484f58;
+    }
+    footer a { color: #58a6ff; text-decoration: none; }
+
+    @media (max-width: 560px) {
+      .summary-strip { grid-template-columns: repeat(2, 1fr); }
+      .scores-grid   { grid-template-columns: 1fr; }
+      .hero h2 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="11" stroke="#58a6ff" stroke-width="1.5"/>
+    <path d="M8 16l2-4 2 2 2-6 2 8" stroke="#58a6ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+  <h1>Repo Intelligence Analyzer <span>v2.0</span></h1>
+</header>
+
+<main style="padding: 0 24px;">
+  <div class="hero">
+    <h2>Understand any GitHub repo in seconds</h2>
+    <p>Analyzes activity, structural complexity, project health, and contributor distribution — then classifies how hard it is to contribute to.</p>
+    <div class="pills">
+      <span class="pill"><b>Activity</b> score</span>
+      <span class="pill"><b>Complexity</b> score</span>
+      <span class="pill"><b>Health</b> score ★</span>
+      <span class="pill"><b>Bus Factor</b> score ★</span>
+      <span class="pill">Beginner / Intermediate / Advanced</span>
+    </div>
+  </div>
+
+  <div class="input-card" style="padding:0; overflow:hidden;">
+    <div class="tabs" style="padding: 0 24px; margin-bottom:0;">
+      <button class="tab active" id="tab-repos" onclick="switchTab('repos')">Repositories</button>
+      <button class="tab" id="tab-org"   onclick="switchTab('org')">Organisation</button>
+    </div>
+
+    <div style="padding: 20px 24px 24px;">
+      <!-- Repos tab -->
+      <div id="pane-repos">
+        <label>GitHub repository URLs <span style="color:#484f58;">(one per line, max 10)</span></label>
+        <textarea id="urls-input" placeholder="https://github.com/c2siorg/Webiu&#10;https://github.com/c2siorg/NFT-Toolbox&#10;https://github.com/torvalds/linux"></textarea>
+        <div class="hint">Tip: paste any GitHub URL — the tool handles the rest.</div>
+        <button class="btn" id="btn-repos" onclick="analyzeRepos()">
+          <span id="spinner-repos" class="spinner"></span>
+          Analyze Repositories
+        </button>
+      </div>
+
+      <!-- Org tab -->
+      <div id="pane-org" style="display:none;">
+        <label>GitHub organisation name</label>
+        <input type="text" id="org-input" placeholder="c2siorg" />
+        <div class="hint">Analyzes up to 20 most recently pushed public repositories.</div>
+        <button class="btn" id="btn-org" onclick="analyzeOrg()">
+          <span id="spinner-org" class="spinner"></span>
+          Analyze Organisation
+        </button>
+      </div>
+
+      <div class="error-box" id="error-box"></div>
+    </div>
+  </div>
+
+  <div id="result"></div>
+</main>
+
+<footer>
+  Built for <a href="https://github.com/c2siorg/Webiu/issues/541" target="_blank" rel="noopener">Pre-GSoC 2026 #541</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Hari20032005/repo-intelligence-analyzer" target="_blank" rel="noopener">Source code</a>
+  &nbsp;·&nbsp;
+  <a href="/analyze" target="_blank" rel="noopener">JSON API</a>
+</footer>
+
+<script>
+  function switchTab(tab) {
+    document.getElementById('pane-repos').style.display = tab === 'repos' ? '' : 'none';
+    document.getElementById('pane-org').style.display   = tab === 'org'   ? '' : 'none';
+    document.getElementById('tab-repos').classList.toggle('active', tab === 'repos');
+    document.getElementById('tab-org').classList.toggle('active',   tab === 'org');
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('result').innerHTML = '';
+  }
+
+  function setLoading(key, on) {
+    document.getElementById('spinner-' + key).style.display = on ? 'block' : 'none';
+    document.getElementById('btn-' + key).disabled = on;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-box');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  async function analyzeRepos() {
+    const raw = document.getElementById('urls-input').value.trim();
+    if (!raw) { showError('Enter at least one GitHub repository URL.'); return; }
+    const urls = raw.split('\n').map(u => u.trim()).filter(Boolean).slice(0, 10);
+
+    document.getElementById('error-box').style.display = 'none';
+    setLoading('repos', true);
+    try {
+      const res = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ urls }),
+      });
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Request failed.'); return; }
+      renderResult(data);
+    } catch (e) {
+      showError('Network error: ' + e.message);
+    } finally {
+      setLoading('repos', false);
+    }
+  }
+
+  async function analyzeOrg() {
+    const org = document.getElementById('org-input').value.trim();
+    if (!org) { showError('Enter a GitHub organisation name.'); return; }
+
+    document.getElementById('error-box').style.display = 'none';
+    setLoading('org', true);
+    try {
+      const res = await fetch(`/analyze/org/${encodeURIComponent(org)}?limit=20`);
+      const data = await res.json();
+      if (!res.ok) { showError(data.error || 'Request failed.'); return; }
+      renderResult(data);
+    } catch (e) {
+      showError('Network error: ' + e.message);
+    } finally {
+      setLoading('org', false);
+    }
+  }
+
+  function scoreColor(score) {
+    if (score >= 70) return '#3fb950';
+    if (score >= 40) return '#d29922';
+    return '#f85149';
+  }
+
+  function badgeClass(d) {
+    return d === 'Beginner' ? 'badge-beginner' : d === 'Intermediate' ? 'badge-intermediate' : 'badge-advanced';
+  }
+
+  function sig(label, ok) {
+    return `<span class="sig ${ok ? 'sig-ok' : 'sig-no'}">${ok ? '✓' : '✗'} ${label}</span>`;
+  }
+
+  function scoreBar(label, score, color) {
+    return `<div class="score-row">
+      <div class="score-label-row"><span>${label}</span><span>${score}</span></div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${score}%;background:${color};"></div></div>
+    </div>`;
+  }
+
+  function renderResult(data) {
+    const el = document.getElementById('result');
+    const s = data.summary;
+
+    let html = `
+    <div class="summary-strip">
+      <div class="stat-card"><div class="stat-num">${s.total}</div><div class="stat-label">Repos analysed</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#3fb950;">${s.beginner}</div><div class="stat-label">Beginner</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#d29922;">${s.intermediate}</div><div class="stat-label">Intermediate</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:#f85149;">${s.advanced}</div><div class="stat-label">Advanced</div></div>
+    </div>`;
+
+    if (data.rateLimit) {
+      const pct = Math.round(data.rateLimit.remaining / data.rateLimit.limit * 100);
+      html += `<div class="rate-limit-note">GitHub API: ${data.rateLimit.remaining}/${data.rateLimit.limit} requests remaining (${pct}%)</div>`;
+    }
+
+    for (const r of data.reports) {
+      if (r.error) {
+        html += `<div class="error-card">
+          <a href="${r.url}" target="_blank" rel="noopener">${r.url}</a>
+          <span style="color:#f85149;"> — ${r.error}</span>
+        </div>`;
+        continue;
+      }
+
+      const hs = r.metrics.healthSignals;
+      html += `<div class="repo-card">
+        <div class="repo-header">
+          <div>
+            <a class="repo-name" href="${r.url}" target="_blank" rel="noopener">${r.owner}/${r.repo}</a>
+            ${r.archived ? '<span style="font-size:11px;color:#6e7681;margin-left:6px;">archived</span>' : ''}
+            ${r.language ? `<span style="font-size:11px;color:#58a6ff;margin-left:6px;">${r.language}</span>` : ''}
+            <div class="repo-desc">${r.description || 'No description.'}</div>
+          </div>
+          <span class="badge ${badgeClass(r.difficulty)}">${r.difficulty}</span>
+        </div>
+
+        <div class="meta-row">
+          <span>⭐ <b>${r.metrics.stars.toLocaleString()}</b></span>
+          <span>🍴 <b>${r.metrics.forks.toLocaleString()}</b></span>
+          <span>👥 <b>${r.metrics.contributors.toLocaleString()}</b> contributors</span>
+          <span>📝 <b>${r.metrics.recentCommits}</b> commits (4w)</span>
+          <span>📁 <b>${r.metrics.fileCount.toLocaleString()}</b> files</span>
+          <span>🔤 <b>${r.metrics.languageCount}</b> languages</span>
+        </div>
+
+        <div class="scores-grid">
+          ${scoreBar('Activity',   r.scores.activityScore,   scoreColor(r.scores.activityScore))}
+          ${scoreBar('Complexity', r.scores.complexityScore, scoreColor(100 - r.scores.complexityScore))}
+          ${scoreBar('Health',     r.scores.healthScore,     scoreColor(r.scores.healthScore))}
+          ${scoreBar('Bus Factor', r.scores.busFactorScore,  scoreColor(r.scores.busFactorScore))}
+        </div>
+
+        <div class="health-row">
+          ${sig('CONTRIBUTING', hs.hasContributing)}
+          ${sig('CI/CD', hs.hasCICD)}
+          ${sig('Issue Templates', hs.hasIssueTemplates)}
+          ${sig('Code of Conduct', hs.hasCodeOfConduct)}
+          ${sig('Security Policy', hs.hasSecurityPolicy)}
+          ${sig('Changelog', hs.hasChangelog)}
+          <span style="margin-left:auto;color:#484f58;">Top contributor: ${r.metrics.topContributorPct}% of commits</span>
+        </div>
+      </div>`;
+    }
+
+    el.innerHTML = html;
+  }
+
+  // Pre-fill example on load
+  document.getElementById('urls-input').value =
+    'https://github.com/c2siorg/Webiu\nhttps://github.com/c2siorg/NFT-Toolbox\nhttps://github.com/c2siorg/SCoRE';
+</script>
+</body>
+</html>

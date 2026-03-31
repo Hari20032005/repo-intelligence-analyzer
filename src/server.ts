@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'path';
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { analyzeRepos, analyzeOrg } from './analyzer';
@@ -7,12 +8,13 @@ import { generateHtmlReport } from './report';
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const PORT = process.env.PORT || 3000;
 const GITHUB_TOKEN = process.env.GITHUB_ACCESS_TOKEN;
 
-// ─── Health check / API index ────────────────────────────────────────────────
-app.get('/', (_req: Request, res: Response) => {
+// ─── API index (JSON) ────────────────────────────────────────────────────────
+app.get('/api', (_req: Request, res: Response) => {
   res.json({
     service: 'repo-intelligence-analyzer',
     version: '2.0.0',
