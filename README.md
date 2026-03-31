@@ -2,9 +2,29 @@
 
 > Pre-GSoC 2026 Task 2 submission for [c2siorg/Webiu #541](https://github.com/c2siorg/Webiu/issues/541)
 
-Analyzes GitHub repositories and generates structured reports covering **activity score**, **complexity score**, and **learning difficulty classification** (Beginner / Intermediate / Advanced).
+Analyzes GitHub repositories and generates structured intelligence reports covering **activity**, **structural complexity**, **project health**, and **bus-factor distribution** — all combined into a learning-difficulty classification (Beginner / Intermediate / Advanced).
 
 **Live Demo:** `https://repo-intelligence-analyzer.onrender.com`
+
+**HTML Report Demo:** `https://repo-intelligence-analyzer.onrender.com/report?urls=https://github.com/c2siorg/Webiu,https://github.com/c2siorg/NFT-Toolbox`
+
+**Org Report Demo:** `https://repo-intelligence-analyzer.onrender.com/report/org/c2siorg`
+
+---
+
+## What's new in v2
+
+| Feature | v1 | v2 |
+|---|---|---|
+| Scores per repo | 2 (activity, complexity) | **4** (+ health, bus factor) |
+| Difficulty formula | 2-factor | **4-factor** (health & bus factor lower difficulty) |
+| API calls per repo | 7 (tree fetched twice) | **6** (tree cached and shared) |
+| Retry logic | None | **Exponential back-off** on 429/5xx |
+| HTML report | None | **`/report` and `/report/org/:org`** endpoints |
+| Org analysis | None | **`/analyze/org/:org`** — analyze all repos in an org |
+| Rate limit info | Not returned | **Included** in every response |
+| Health signals | Not detected | **CONTRIBUTING, CI/CD, templates, CoC, Security, Changelog** |
+| Bus factor | Not measured | **Top-contributor concentration score** |
 
 ---
 
@@ -12,7 +32,7 @@ Analyzes GitHub repositories and generates structured reports covering **activit
 
 ### Prerequisites
 - Node.js ≥ 18
-- A GitHub personal access token *(optional but recommended — raises rate limit from 60 to 5000 req/hour)*
+- A GitHub personal access token *(optional but recommended — raises rate limit from 60 to 5 000 req/hour)*
 
 ### Install & Run
 
@@ -35,14 +55,12 @@ Server starts at `http://localhost:3000`.
 
 ---
 
-## API Usage
+## API Reference
 
-### `GET /` — Health check
-```bash
-curl http://localhost:3000/
-```
+### `GET /` — Service index
+Returns available endpoints.
 
-### `POST /analyze` — Analyze repositories
+### `POST /analyze` — Analyze repositories (JSON)
 
 ```bash
 curl -X POST http://localhost:3000/analyze \
@@ -55,23 +73,51 @@ curl -X POST http://localhost:3000/analyze \
   }'
 ```
 
-### `GET /analyze?urls=` — Quick single/multiple analysis
+### `GET /analyze?urls=` — Quick analysis (comma-separated)
 
 ```bash
 curl "http://localhost:3000/analyze?urls=https://github.com/c2siorg/Webiu,https://github.com/c2siorg/SCoRE"
 ```
 
-### Response structure
+### `GET /analyze/org/:org` — Analyze all repos in a GitHub org
+
+```bash
+curl "http://localhost:3000/analyze/org/c2siorg?limit=10"
+```
+
+- Default `limit`: 20 repositories (max: 30, sorted by most recently pushed)
+
+### `GET /report?urls=` — HTML intelligence report
+
+```bash
+# Open in browser:
+http://localhost:3000/report?urls=https://github.com/c2siorg/Webiu,https://github.com/c2siorg/NFT-Toolbox
+```
+
+Returns a fully rendered HTML page with visual score bars, health signal badges, and difficulty distribution.
+
+### `GET /report/org/:org` — HTML report for entire org
+
+```bash
+http://localhost:3000/report/org/c2siorg?limit=10
+```
+
+---
+
+## Response Structure
 
 ```json
 {
   "summary": {
     "total": 2,
+    "successful": 2,
+    "failed": 0,
     "beginner": 0,
     "intermediate": 2,
     "advanced": 0,
     "averageActivity": 54,
-    "averageComplexity": 48
+    "averageComplexity": 48,
+    "averageHealth": 65
   },
   "reports": [
     {
@@ -81,26 +127,44 @@ curl "http://localhost:3000/analyze?urls=https://github.com/c2siorg/Webiu,https:
       "description": "C2SI Organization Website",
       "language": "TypeScript",
       "topics": ["angular", "nestjs"],
+      "license": "Apache License 2.0",
+      "archived": false,
       "metrics": {
         "stars": 68,
         "forks": 112,
         "openIssues": 24,
         "contributors": 52,
+        "topContributorPct": 34,
         "languages": { "TypeScript": 312450, "HTML": 21340 },
         "languageCount": 6,
         "fileCount": 284,
         "dependencyFiles": ["package.json", "webiu-server/package.json"],
-        "recentCommits": 34
+        "recentCommits": 34,
+        "healthSignals": {
+          "hasContributing": true,
+          "hasCodeOfConduct": true,
+          "hasIssueTemplates": true,
+          "hasCICD": true,
+          "hasSecurityPolicy": false,
+          "hasChangelog": false
+        }
       },
       "scores": {
         "activityScore": 55,
         "complexityScore": 44,
-        "combinedScore": 48
+        "healthScore": 85,
+        "busFactorScore": 66,
+        "combinedScore": 38
       },
       "difficulty": "Intermediate",
       "analysedAt": "2026-03-14T10:00:00.000Z"
     }
-  ]
+  ],
+  "rateLimit": {
+    "remaining": 4821,
+    "limit": 5000,
+    "resetAt": "2026-03-14T11:00:00.000Z"
+  }
 }
 ```
 
@@ -109,7 +173,6 @@ curl "http://localhost:3000/analyze?urls=https://github.com/c2siorg/Webiu,https:
 ## CLI Usage
 
 ```bash
-# Analyze one or more repos directly from the terminal
 npm run analyze https://github.com/c2siorg/Webiu https://github.com/c2siorg/SCoRE
 ```
 
@@ -117,11 +180,22 @@ npm run analyze https://github.com/c2siorg/Webiu https://github.com/c2siorg/SCoR
 
 ## Scoring Overview
 
-| Score | Formula | Range |
+### Four independent scores
+
+| Score | Formula summary | Range |
 |---|---|---|
-| **Activity** | `(recentCommits×0.4) + (stars×0.2) + (forks×0.15) + (issues×0.15) + (contributors×0.1)` | 0–100 |
-| **Complexity** | `(fileCount×0.4) + (languageCount×0.3) + (depFiles×0.3)` | 0–100 |
-| **Combined** | `activity×0.4 + complexity×0.6` | 0–100 |
+| **Activity** | `commits(40%) + stars(20%) + forks(15%) + issues(15%) + contributors(10%)` | 0–100 |
+| **Complexity** | `fileCount(40%) + languageCount(30%) + depFiles(30%)` | 0–100 |
+| **Health** ★ | `CONTRIBUTING(25) + CI/CD(25) + templates(20) + CoC(15) + Security(10) + Changelog(5)` | 0–100 |
+| **Bus Factor** ★ | `(1 - topContributorPct) × 100` | 0–100 |
+
+### Combined score & difficulty
+
+```
+combinedScore = complexity×0.45 + activity×0.25 + (100−health)×0.20 + (100−busFactor)×0.10
+```
+
+High health and high bus-factor **lower** the combined score — a complex repo with great docs and distributed contributions is genuinely more approachable.
 
 **Difficulty:** Combined < 30 → Beginner · < 60 → Intermediate · ≥ 60 → Advanced
 
@@ -131,43 +205,42 @@ Full methodology: [`docs/scoring-methodology.md`](docs/scoring-methodology.md)
 
 ## Sample Analyses
 
-Pre-generated reports for 5 c2siorg repositories are available in [`docs/sample-analyses.json`](docs/sample-analyses.json).
+Pre-generated reports: [`docs/sample-analyses.json`](docs/sample-analyses.json)
 
-| Repository | Activity | Complexity | Difficulty |
-|---|---|---|---|
-| c2siorg/Webiu | 55 | 44 | Intermediate |
-| c2siorg/SCoRE | 36 | 32 | Intermediate |
-| c2siorg/RoadMap | 14 | 5 | Beginner |
-| c2siorg/codefactor | 67 | 52 | Intermediate |
-| c2siorg/NFT-Toolbox | 53 | 57 | Intermediate |
+| Repository | Activity | Complexity | Health | Bus Factor | Difficulty |
+|---|---|---|---|---|---|
+| c2siorg/Webiu | 55 | 44 | 85 | 66 | Intermediate |
+| c2siorg/SCoRE | 36 | 32 | 60 | 45 | Intermediate |
+| c2siorg/RoadMap | 14 | 5 | 40 | 30 | Beginner |
+| c2siorg/codefactor | 67 | 52 | 75 | 58 | Intermediate |
+| c2siorg/NFT-Toolbox | 53 | 57 | 70 | 62 | Intermediate |
 
 ---
 
 ## Architecture (Task 1)
 
-See [`docs/architecture.md`](docs/architecture.md) for the full scalable GitHub data aggregation system design covering:
-- Two-tier caching (in-process + Redis)
-- Webhook-driven cache invalidation
-- Rate-limit handling with exponential back-off
-- Scalability from 300 → 10 000 repositories
-
----
-
-## Deployment on Render (Free)
-
-1. Fork this repo
-2. Go to [render.com](https://render.com) → New → Web Service → connect your fork
-3. Set environment variable: `GITHUB_ACCESS_TOKEN=ghp_your_token`
-4. Deploy — Render uses `render.yaml` automatically
+See [`docs/architecture.md`](docs/architecture.md) for the full scalable design covering:
+- Two-tier caching (L1 in-process Map + L2 Redis) with read-through strategy
+- Webhook-driven real-time cache invalidation with HMAC verification
+- GraphQL batching (20 repos per query → 10× API call reduction)
+- Incremental sync (only changed repos → 95% call reduction vs. full poll)
+- ETag conditional requests (~40–60% savings on stable repos)
+- Scalability path: 300 → 1k → 5k → 10 000 repositories
+- Failure handling with circuit breaker, DLQ, and Prometheus alerting
 
 ---
 
 ## Rate Limit Handling
 
-- All API responses are cached in-memory for 5 minutes — repeated requests for the same repo cost zero additional API calls.
-- Unauthenticated: 60 req/hour (enough for ~5 repos per run).
-- With a token: 5 000 req/hour (enough for 100+ repos per run).
-- GitHub's `/stats/commit_activity` may return HTTP 202 on first request (data is computing). The tool gracefully returns 0 recent commits and the cached result populates on the next request.
+| Strategy | Savings | Implementation |
+|---|---|---|
+| In-memory cache (5-min TTL) | 90–99% on hot paths | `Map<key, {data, expiresAt}>` |
+| Shared tree fetch | 1 call saved per repo | `getRepoTree()` cached, shared by file count + deps + health |
+| Exponential back-off | Survives bursts | Retry on 429/5xx: `2^attempt × 300ms`, max 3 attempts |
+| Rate limit status in response | Visibility | `GET /rate_limit` appended to every analysis response |
+
+- **Unauthenticated:** 60 req/hour → ~5 repos per run
+- **With token:** 5 000 req/hour → 400+ repos per run
 
 ---
 
@@ -175,13 +248,22 @@ See [`docs/architecture.md`](docs/architecture.md) for the full scalable GitHub 
 
 ```
 src/
-├── github.ts      — GitHub API client with in-memory caching
-├── scorer.ts      — Activity score, complexity score, difficulty classification
-├── analyzer.ts    — Orchestrates analysis for one or many repos
-├── server.ts      — Express API server (POST /analyze, GET /analyze)
-└── cli.ts         — CLI entry point
+├── github.ts      — GitHub API client: caching, retry, health signals, bus factor
+├── scorer.ts      — Activity, complexity, health, bus-factor scores + difficulty
+├── analyzer.ts    — Orchestrates single/batch/org analysis
+├── report.ts      — HTML report generator (self-contained, no external CSS)
+└── server.ts      — Express API: /analyze, /analyze/org, /report, /report/org
 docs/
 ├── architecture.md          — Task 1: scalable system design
-├── scoring-methodology.md   — Formulas, assumptions, limitations
-└── sample-analyses.json     — Pre-generated reports for 5 repos
+├── scoring-methodology.md   — All formulas, weights, assumptions, edge cases
+└── sample-analyses.json     — Pre-generated reports for 5 c2siorg repos
 ```
+
+---
+
+## Deployment on Render
+
+1. Fork this repo
+2. Go to [render.com](https://render.com) → New → Web Service → connect your fork
+3. Set environment variable: `GITHUB_ACCESS_TOKEN=ghp_your_token`
+4. Deploy — Render reads `render.yaml` automatically
